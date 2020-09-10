@@ -1,17 +1,8 @@
-%% The contents of this file are subject to the Mozilla Public License
-%% Version 1.1 (the "License"); you may not use this file except in
-%% compliance with the License. You may obtain a copy of the License at
-%% https://www.mozilla.org/MPL/
+%% This Source Code Form is subject to the terms of the Mozilla Public
+%% License, v. 2.0. If a copy of the MPL was not distributed with this
+%% file, You can obtain one at https://mozilla.org/MPL/2.0/.
 %%
-%% Software distributed under the License is distributed on an "AS IS"
-%% basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
-%% License for the specific language governing rights and limitations
-%% under the License.
-%%
-%% The Original Code is RabbitMQ.
-%%
-%% The Initial Developer of the Original Code is GoPivotal, Inc.
-%% Copyright (c) 2016 Pivotal Software, Inc.  All rights reserved.
+%% Copyright (c) 2016-2020 VMware, Inc. or its affiliates.  All rights reserved.
 %%
 
 -module(unit_SUITE).
@@ -142,7 +133,10 @@ amqp_uri_parsing(_Config) ->
 
     {ok, #amqp_params_network{host = "host1", ssl_options = TLSOpts1}} =
         amqp_uri:parse("amqps://host1/%2f?cacertfile=/path/to/cacertfile.pem"),
-    Exp1 = [{cacertfile,"/path/to/cacertfile.pem"}],
+    Exp1 = [
+        {cacertfile,"/path/to/cacertfile.pem"},
+        {server_name_indication,"host1"}
+    ],
     ?assertEqual(lists:usort(Exp1), lists:usort(TLSOpts1)),
 
     {ok, #amqp_params_network{host = "host2", ssl_options = TLSOpts2}} =
@@ -161,7 +155,8 @@ amqp_uri_parsing(_Config) ->
         amqp_uri:parse("amqps://host3/%2f?verify=verify_peer"
                        "&fail_if_no_peer_cert=true"),
     Exp3 = [{fail_if_no_peer_cert, true},
-            {verify, verify_peer}],
+            {verify, verify_peer},
+            {server_name_indication,"host3"}],
     ?assertEqual(lists:usort(Exp3), lists:usort(TLSOpts3)),
 
     {ok, #amqp_params_network{host = "host4", ssl_options = TLSOpts4}} =
@@ -172,7 +167,8 @@ amqp_uri_parsing(_Config) ->
     Exp4 = [{certfile,  "/path/to/certfile.pem"},
             {cacertfile,"/path/to/cacertfile.pem"},
             {password,  "topsecret"},
-            {depth,     5}],
+            {depth,     5},
+            {server_name_indication,"host4"}],
     ?assertEqual(lists:usort(Exp4), lists:usort(TLSOpts4)),
 
     {ok, #amqp_params_network{host = "host5", ssl_options = TLSOpts5}} =
@@ -367,23 +363,26 @@ rabbit_channel_build_topic_variable_map(_Config) ->
                 {variable_map, #{<<"client_id">> => <<"client99">>}}]}
     },
     %% simple case
-    #{<<"client_id">> := <<"client99">>,
-      <<"username">>  := <<"guest">>,
-      <<"vhost">>     := <<"default">>} = rabbit_channel:build_topic_variable_map(
+    ?assertMatch(
+        #{<<"client_id">> := <<"client99">>,
+          <<"username">>  := <<"guest">>,
+          <<"vhost">>     := <<"default">>}, rabbit_channel:build_topic_variable_map(
         [{amqp_params, AmqpParams}], <<"default">>, <<"guest">>
-    ),
+    )),
     %% nothing to add
     AmqpParams1 = #amqp_params_direct{adapter_info = #amqp_adapter_info{}},
-    #{<<"username">>  := <<"guest">>,
-      <<"vhost">>     := <<"default">>} = rabbit_channel:build_topic_variable_map(
+    ?assertMatch(
+        #{<<"username">>  := <<"guest">>,
+          <<"vhost">>     := <<"default">>}, rabbit_channel:build_topic_variable_map(
         [{amqp_params, AmqpParams1}], <<"default">>, <<"guest">>
-    ),
+    )),
     %% nothing to add with amqp_params_network
     AmqpParams2 = #amqp_params_network{},
-    #{<<"username">>  := <<"guest">>,
-      <<"vhost">>     := <<"default">>} = rabbit_channel:build_topic_variable_map(
+    ?assertMatch(
+        #{<<"username">>  := <<"guest">>,
+         <<"vhost">>     := <<"default">>}, rabbit_channel:build_topic_variable_map(
         [{amqp_params, AmqpParams2}], <<"default">>, <<"guest">>
-    ),
+    )),
     %% trying to override channel variables, but those
     %% take precedence
     AmqpParams3 = #amqp_params_direct{
@@ -392,9 +391,9 @@ rabbit_channel_build_topic_variable_map(_Config) ->
                 {variable_map, #{<<"client_id">> => <<"client99">>,
                                  <<"username">>  => <<"admin">>}}]}
     },
-    #{<<"client_id">> := <<"client99">>,
-      <<"username">>  := <<"guest">>,
-      <<"vhost">>     := <<"default">>} = rabbit_channel:build_topic_variable_map(
+    ?assertMatch(#{<<"client_id">> := <<"client99">>,
+                   <<"username">>  := <<"guest">>,
+                   <<"vhost">>     := <<"default">>}, rabbit_channel:build_topic_variable_map(
         [{amqp_params, AmqpParams3}], <<"default">>, <<"guest">>
-    ),
+    )),
     ok.
